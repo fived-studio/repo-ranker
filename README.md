@@ -84,7 +84,7 @@ pnpm --filter @repo-ranker/api-spec run codegen
 
 ## Contributing
 
-See [CONTRIBUTING.md](./CONTRIBUTING.md).
+This repo follows the [FiveD Studio contribution guide](https://github.com/fived-studio/.github/blob/main/CONTRIBUTING.md). For repo-specific notes (codegen, workspace layout), see the sections above.
 
 ## License
 
