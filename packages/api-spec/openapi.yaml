@@ -1,0 +1,300 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: API specification
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: repos
+    description: GitHub repository traffic ranking
+security:
+  - ApiKeyAuth: []
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      description: Returns server health status
+      security: []
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+  /me:
+    get:
+      operationId: getMe
+      tags: [repos]
+      summary: Get current GitHub user
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GitHubUser"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+  /repos:
+    get:
+      operationId: listRepoTraffic
+      tags: [repos]
+      summary: List all repos with traffic ranking data
+      description: Fetches every repo owned by the configured user and enriches each with 14-day traffic stats (views and clones).
+      responses:
+        "200":
+          description: Ranked repos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RepoTrafficList"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+  /repos/{owner}/{repo}/traffic:
+    get:
+      operationId: getRepoTrafficDetail
+      tags: [repos]
+      summary: Detailed traffic for a single repo
+      parameters:
+        - name: owner
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: repo
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Traffic detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RepoTrafficDetail"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+    GitHubUser:
+      type: object
+      properties:
+        login:
+          type: string
+        name:
+          type: string
+          nullable: true
+        avatarUrl:
+          type: string
+        htmlUrl:
+          type: string
+        bio:
+          type: string
+          nullable: true
+        publicRepos:
+          type: integer
+        followers:
+          type: integer
+        following:
+          type: integer
+      required:
+        - login
+        - avatarUrl
+        - htmlUrl
+        - publicRepos
+        - followers
+        - following
+    TrafficSummary:
+      type: object
+      properties:
+        total:
+          type: integer
+        unique:
+          type: integer
+      required: [total, unique]
+    TrafficBucket:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          description: ISO8601 day bucket
+        count:
+          type: integer
+        uniques:
+          type: integer
+      required: [timestamp, count, uniques]
+    RepoTraffic:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        fullName:
+          type: string
+        description:
+          type: string
+          nullable: true
+        htmlUrl:
+          type: string
+        language:
+          type: string
+          nullable: true
+        stars:
+          type: integer
+        forks:
+          type: integer
+        watchers:
+          type: integer
+        openIssues:
+          type: integer
+        isPrivate:
+          type: boolean
+        isFork:
+          type: boolean
+        isArchived:
+          type: boolean
+        pushedAt:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          nullable: true
+        views:
+          $ref: "#/components/schemas/TrafficSummary"
+        clones:
+          $ref: "#/components/schemas/TrafficSummary"
+        trafficError:
+          type: string
+          nullable: true
+          description: Set if traffic data could not be fetched (e.g. insufficient permissions)
+      required:
+        - id
+        - name
+        - fullName
+        - htmlUrl
+        - stars
+        - forks
+        - watchers
+        - openIssues
+        - isPrivate
+        - isFork
+        - isArchived
+        - views
+        - clones
+    RepoTrafficList:
+      type: object
+      properties:
+        user:
+          $ref: "#/components/schemas/GitHubUser"
+        repos:
+          type: array
+          items:
+            $ref: "#/components/schemas/RepoTraffic"
+        totals:
+          type: object
+          properties:
+            views:
+              $ref: "#/components/schemas/TrafficSummary"
+            clones:
+              $ref: "#/components/schemas/TrafficSummary"
+            repoCount:
+              type: integer
+          required: [views, clones, repoCount]
+        fetchedAt:
+          type: string
+      required: [user, repos, totals, fetchedAt]
+    RepoTrafficDetail:
+      type: object
+      properties:
+        repo:
+          $ref: "#/components/schemas/RepoTraffic"
+        viewsSeries:
+          type: array
+          items:
+            $ref: "#/components/schemas/TrafficBucket"
+        clonesSeries:
+          type: array
+          items:
+            $ref: "#/components/schemas/TrafficBucket"
+        topReferrers:
+          type: array
+          items:
+            type: object
+            properties:
+              referrer:
+                type: string
+              count:
+                type: integer
+              uniques:
+                type: integer
+            required: [referrer, count, uniques]
+        topPaths:
+          type: array
+          items:
+            type: object
+            properties:
+              path:
+                type: string
+              title:
+                type: string
+              count:
+                type: integer
+              uniques:
+                type: integer
+            required: [path, title, count, uniques]
+      required: [repo, viewsSeries, clonesSeries, topReferrers, topPaths]
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required: [error]
+  responses:
+    Unauthorized:
+      description: Missing or invalid API key
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Forbidden:
+      description: Access to the requested resource is not allowed
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    TooManyRequests:
+      description: Rate limit exceeded
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
